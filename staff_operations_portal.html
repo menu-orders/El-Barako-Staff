@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ELBarako Café | Staff Operations & Admin Portal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase JS Client v2 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        barako: {
+                            50: '#fdf8f4',
+                            100: '#f8eedf',
+                            200: '#ebd7bd',
+                            300: '#dcbb93',
+                            400: '#cb9a69',
+                            500: '#bd7f46',
+                            600: '#a66539',
+                            700: '#864c31',
+                            800: '#6f3e2e',
+                            900: '#3d2017',
+                            dark: '#23120c',
+                            gold: '#d4af37'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f4f6f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cb9a69;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="text-gray-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Staff Header -->
+    <header class="bg-barako-dark text-white shadow-lg border-b border-barako-800 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-barako-700 border-2 border-barako-gold flex items-center justify-center font-bold text-barako-gold text-sm shadow">
+                    STAFF
+                </div>
+                <div>
+                    <h1 class="text-lg font-black tracking-wide text-white">ELBarako Café • Kitchen & Staff Portal</h1>
+                    <p class="text-xs text-barako-300 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Live Sync Active</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="flex items-center gap-2 bg-barako-900 p-1.5 rounded-xl border border-barako-800">
+                <button onclick="switchTab('orders')" id="tab-btn-orders" class="px-4 py-2 rounded-lg text-xs font-bold transition-all bg-barako-600 text-white shadow">
+                    <i class="fa-solid fa-bell-concierge mr-1.5"></i> Live Orders
+                    <span id="pending-badge" class="ml-1 bg-red-600 text-white px-1.5 py-0.5 rounded-full text-[10px] hidden">0</span>
+                </button>
+                <button onclick="switchTab('menu')" id="tab-btn-menu" class="px-4 py-2 rounded-lg text-xs font-bold transition-all text-barako-200 hover:text-white">
+                    <i class="fa-solid fa-utensils mr-1.5"></i> Menu Availability
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        
+        <!-- ORDERS TAB VIEW -->
+        <div id="view-orders" class="space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <div>
+                    <h2 class="text-base font-bold text-gray-900">Incoming Customer Orders</h2>
+                    <p class="text-xs text-gray-500">Update customer order statuses in real-time. Changes instantly reflect on Website A.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="setOrderFilter('All')" id="filter-All" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-barako-800 text-white">All Orders</button>
+                    <button onclick="setOrderFilter('Pending')" id="filter-Pending" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-600">Pending</button>
+                    <button onclick="setOrderFilter('Active')" id="filter-Active" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-600">In Progress</button>
+                </div>
+            </div>
+
+            <!-- Orders Grid -->
+            <div id="staff-orders-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="col-span-full text-center py-12 text-gray-400">
+                    <i class="fa-solid fa-spinner fa-spin text-3xl mb-2"></i>
+                    <p class="text-xs">Connecting to database...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- MENU AVAILABILITY TAB VIEW -->
+        <div id="view-menu" class="space-y-6 hidden">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex justify-between items-center">
+                <div>
+                    <h2 class="text-base font-bold text-gray-900">Full Menu & Stock Availability Manager</h2>
+                    <p class="text-xs text-gray-500">Toggle items as Available or Out of Stock. Customers on Website A will see updates instantly.</p>
+                </div>
+            </div>
+
+            <!-- Menu Inventory Grid -->
+            <div id="staff-menu-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Populated via JS -->
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const SUPABASE_URL = "https://kgxrdxbysdnwcuwppils.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_cG_oCE-x0_jLxOvCq6cblA_7fE3nvXU";
+        
+        let db = null;
+        try {
+            if (window.supabase) {
+                db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            }
+        } catch (e) { console.warn("Supabase init error:", e); }
+
+        let ordersList = [];
+        let menuList = [];
+        let currentTab = 'orders';
+        let currentOrderFilter = 'All';
+
+        window.onload = function() {
+            fetchAllData();
+            setInterval(fetchAllData, 3000); // Live polling for instant sync every 3s
+        };
+
+        async function fetchAllData() {
+            if (!db) return;
+            try {
+                const [ordersRes, menuRes] = await Promise.all([
+                    db.from('orders').select('*').order('created_at', { ascending: false }),
+                    db.from('menu').select('*').order('category', { ascending: true })
+                ]);
+
+                if (!ordersRes.error && ordersRes.data) {
+                    ordersList = ordersRes.data;
+                    renderOrders();
+                }
+                if (!menuRes.error && menuRes.data) {
+                    menuList = menuRes.data;
+                    if (currentTab === 'menu') renderStaffMenu();
+                }
+            } catch (e) { console.error("Fetch error:", e); }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('view-orders').classList.toggle('hidden', tab !== 'orders');
+            document.getElementById('view-menu').classList.toggle('hidden', tab !== 'menu');
+
+            document.getElementById('tab-btn-orders').className = tab === 'orders' ? 'px-4 py-2 rounded-lg text-xs font-bold transition-all bg-barako-600 text-white shadow' : 'px-4 py-2 rounded-lg text-xs font-bold transition-all text-barako-200 hover:text-white';
+            document.getElementById('tab-btn-menu').className = tab === 'menu' ? 'px-4 py-2 rounded-lg text-xs font-bold transition-all bg-barako-600 text-white shadow' : 'px-4 py-2 rounded-lg text-xs font-bold transition-all text-barako-200 hover:text-white';
+
+            if (tab === 'menu') renderStaffMenu();
+        }
+
+        function setOrderFilter(filter) {
+            currentOrderFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.className = 'filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-600';
+            });
+            document.getElementById(`filter-${filter}`).className = 'filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-barako-800 text-white';
+            renderOrders();
+        }
+
+        function renderOrders() {
+            const container = document.getElementById('staff-orders-container');
+            const pendingBadge = document.getElementById('pending-badge');
+
+            const pendingCount = ordersList.filter(o => o.order_status === 'Pending').length;
+            if (pendingCount > 0) {
+                pendingBadge.innerText = pendingCount;
+                pendingBadge.classList.remove('hidden');
+            } else {
+                pendingBadge.classList.add('hidden');
+            }
+
+            const filtered = ordersList.filter(o => {
+                if (currentOrderFilter === 'Pending') return o.order_status === 'Pending';
+                if (currentOrderFilter === 'Active') return ['Confirmed', 'Preparing', 'Ready for Pickup', 'Ready for Delivery'].includes(o.order_status);
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400 bg-white rounded-2xl border border-gray-200"><i class="fa-solid fa-clipboard-list text-3xl mb-2 opacity-50"></i><p class="text-xs">No customer orders found.</p></div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(o => {
+                let statusBg = 'bg-amber-50 border-amber-200 text-amber-800';
+                if (o.order_status === 'Confirmed') statusBg = 'bg-blue-50 border-blue-200 text-blue-800';
+                if (o.order_status === 'Preparing') statusBg = 'bg-purple-50 border-purple-200 text-purple-800';
+                if (o.order_status.includes('Ready')) statusBg = 'bg-emerald-50 border-emerald-200 text-emerald-800';
+                if (o.order_status === 'Completed') statusBg = 'bg-gray-100 border-gray-200 text-gray-600';
+
+                return `
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col justify-between space-y-3">
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-xs font-black uppercase bg-barako-50 text-barako-800 px-2 py-1 rounded border border-barako-200">${sanitizeInput(o.order_type)}</span>
+                                <span class="text-xs font-bold px-2 py-1 rounded-full border ${statusBg}">${sanitizeInput(o.order_status)}</span>
+                            </div>
+                            <h3 class="font-bold text-sm text-gray-900">${sanitizeInput(o.customer_name)}</h3>
+                            <p class="text-xs text-gray-500 mb-2"><i class="fa-solid fa-phone mr-1"></i> ${sanitizeInput(o.contact_number)} ${o.table_number ? '• Table ' + sanitizeInput(o.table_number) : ''} ${o.claim_number ? '• Claim #' + sanitizeInput(o.claim_number) : ''}</p>
+                            ${o.delivery_address ? `<p class="text-xs text-gray-600 bg-gray-50 p-1.5 rounded mb-2"><strong>Address:</strong> ${sanitizeInput(o.delivery_address)}</p>` : ''}
+                            
+                            <div class="bg-gray-50 p-2.5 rounded-lg border border-gray-100 text-xs space-y-1 max-h-32 overflow-y-auto">
+                                ${(o.cart_data || []).map(i => `<div class="flex justify-between"><span>${i.qty}x ${sanitizeInput(i.name)}</span><span class="font-semibold">₱${(i.price * i.qty).toFixed(2)}</span></div>`).join('')}
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-gray-100 flex items-center justify-between">
+                            <span class="text-xs font-black text-barako-800">Total: ₱${Number(o.total_amount).toFixed(2)}</span>
+                            
+                            <select onchange="updateOrderStatus('${o.id}', this.value)" class="text-xs font-bold p-1.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-barako-500 outline-none cursor-pointer">
+                                <option value="" disabled selected>Change Status...</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Confirmed">Confirmed</option>
+                                <option value="Preparing">Preparing</option>
+                                <option value="Ready for Pickup">Ready for Pickup</option>
+                                <option value="Ready for Delivery">Ready for Delivery</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function updateOrderStatus(orderId, newStatus) {
+            if (!db) return;
+            try {
+                const { error } = await db.from('orders').update({ order_status: newStatus }).eq('id', orderId);
+                if (error) alert("Failed to update order status.");
+                else fetchAllData();
+            } catch (e) { console.error("Update status error:", e); }
+        }
+
+        function renderStaffMenu() {
+            const container = document.getElementById('staff-menu-container');
+            if (menuList.length === 0) {
+                container.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400">No menu items found. Run the database SQL setup.</div>`;
+                return;
+            }
+
+            container.innerHTML = menuList.map(item => {
+                const isActive = item.is_active !== false;
+                return `
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-start mb-1">
+                                <h4 class="font-bold text-sm text-gray-900">${sanitizeInput(item.name)}</h4>
+                                <span class="text-xs font-black text-barako-700 bg-barako-50 px-2 py-0.5 rounded border border-barako-200">
+                                    ₱${Number(item.price).toFixed(2)}
+                                </span>
+                            </div>
+                            <span class="inline-block text-[10px] font-bold uppercase tracking-wider text-barako-600 bg-barako-50 px-2 py-0.5 rounded mb-2">${sanitizeInput(item.category)}</span>
+                            <p class="text-xs text-gray-500 line-clamp-2 mb-3">${sanitizeInput(item.description || '')}</p>
+                        </div>
+                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
+                            <span class="text-xs font-bold ${isActive ? 'text-emerald-600' : 'text-red-600'}">
+                                ${isActive ? '<i class="fa-solid fa-check-circle mr-1"></i> In Stock' : '<i class="fa-solid fa-xmark-circle mr-1"></i> Out of Stock'}
+                            </span>
+                            <button onclick="toggleMenuAvailability('${item.id}', ${!isActive})" class="px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${isActive ? 'bg-red-100 hover:bg-red-200 text-red-700' : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700'}">
+                                ${isActive ? 'Mark Unavailable' : 'Mark Available'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function toggleMenuAvailability(itemId, newStatus) {
+            if (!db) return;
+            try {
+                const { error } = await db.from('menu').update({ is_active: newStatus }).eq('id', itemId);
+                if (error) alert("Failed to update menu availability.");
+                else fetchAllData();
+            } catch (e) { console.error("Toggle error:", e); }
+        }
+
+        function sanitizeInput(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+        }
+    </script>
+</body>
+</html>
