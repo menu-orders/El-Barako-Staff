@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EL BARAKO CAFE (Est. 2024) - Wild West Saloon Staff & Kitchen Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Rye (Western display), Cinzel, Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Rye&family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Supabase JS Client UMD Build -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        saloon: {
+                            950: '#1c0f06',
+                            900: '#2b1704',
+                            800: '#3e2108',
+                            700: '#5c330e',
+                            600: '#8b4513',
+                            500: '#a65918',
+                        },
+                        brass: {
+                            light: '#e6c875',
+                            DEFAULT: '#d4af37',
+                            dark: '#c5832b',
+                        },
+                        parchment: {
+                            DEFAULT: '#faf3e0',
+                            dark: '#f4ead3'
+                        }
+                    },
+                    fontFamily: {
+                        rye: ['Rye', 'serif'],
+                        brand: ['Cinzel', 'serif'],
+                        sans: ['Plus Jakarta Sans', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #1c0f06;
+            color: #faf3e0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .font-rye { font-family: 'Rye', serif; }
+        .brand-font { font-family: 'Cinzel', serif; }
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: rgba(28, 15, 6, 0.5); }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.3); border-radius: 3px; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #receipt-print-area, #receipt-print-area * { visibility: visible; }
+            #receipt-print-area { position: absolute; left: 0; top: 0; width: 58mm; padding: 0; margin: 0; color: #000; background: #fff; font-family: monospace; font-size: 11px; }
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12 selection:bg-saloon-800 selection:text-brass-light">
+
+    <!-- TOP HEADER -->
+    <header class="bg-saloon-900 sticky top-0 z-40 border-b-4 border-brass-dark px-4 py-3.5 shadow-xl">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3 py-1">
+                <div class="w-10 h-10 rounded-lg bg-brass flex items-center justify-center text-saloon-950 text-xl font-extrabold shadow-inner border border-saloon-950">
+                    <i class="fa-solid fa-star-of-david"></i>
+                </div>
+                <div class="flex flex-col justify-center">
+                    <h1 class="font-rye text-base sm:text-lg tracking-wider text-brass-light leading-tight">EL BARAKO CAFE</h1>
+                    <span class="text-[9px] sm:text-[10px] text-brass tracking-wider uppercase font-bold block mt-0.5">Est. 2024 • Wild West Saloon Staff Dashboard</span>
+                </div>
+            </div>
+
+            <!-- Controls: Store Status, Take-out, and Delivery Toggles -->
+            <div class="flex flex-wrap items-center gap-2">
+                <button id="toggle-store-btn" onclick="toggleStoreStatus()" class="px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all duration-300 shadow flex items-center space-x-1.5 border bg-saloon-800 text-brass-light border-saloon-700">
+                    <span id="store-dot" class="w-2 h-2 rounded-full bg-brass"></span>
+                    <span id="store-btn-text">CONNECTING...</span>
+                </button>
+
+                <button id="toggle-takeout-btn" onclick="toggleOrderTypeSetting('accept_takeout')" class="px-3 py-1.5 rounded-xl font-bold text-xs transition-all duration-300 shadow flex items-center space-x-1.5 border bg-saloon-800 text-brass-light border-saloon-700">
+                    <span id="takeout-dot" class="w-2 h-2 rounded-full bg-brass"></span>
+                    <span id="takeout-btn-text">Take-out: ...</span>
+                </button>
+
+                <button id="toggle-delivery-btn" onclick="toggleOrderTypeSetting('accept_delivery')" class="px-3 py-1.5 rounded-xl font-bold text-xs transition-all duration-300 shadow flex items-center space-x-1.5 border bg-saloon-800 text-brass-light border-saloon-700">
+                    <span id="delivery-dot" class="w-2 h-2 rounded-full bg-brass"></span>
+                    <span id="delivery-btn-text">Delivery: ...</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-7xl mx-auto px-4 mt-6">
+
+        <!-- DASHBOARD NAVIGATION TABS -->
+        <div class="flex space-x-2 border-b-2 border-saloon-800 pb-3 mb-6 overflow-x-auto scrollbar-thin">
+            <button onclick="switchTab('orders')" id="tab-orders" class="px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 flex items-center space-x-2 bg-brass text-saloon-950 shadow-md border border-brass-dark">
+                <i class="fa-solid fa-clipboard-list"></i>
+                <span>Live Orders</span>
+                <span id="orders-count-badge" class="ml-1 px-2 py-0.5 text-[10px] rounded-full bg-saloon-950 text-brass">0</span>
+            </button>
+            <button onclick="switchTab('stock')" id="tab-stock" class="px-5 py-2.5 rounded-xl font-bold text-xs text-brass-light hover:text-white hover:bg-saloon-800 transition-all duration-200 flex items-center space-x-2 border border-saloon-700">
+                <i class="fa-solid fa-box"></i>
+                <span>Menu Stock Control</span>
+            </button>
+            <button onclick="switchTab('shift')" id="tab-shift" class="px-5 py-2.5 rounded-xl font-bold text-xs text-brass-light hover:text-white hover:bg-saloon-800 transition-all duration-200 flex items-center space-x-2 border border-saloon-700">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span>Shift Analytics & Reset</span>
+            </button>
+        </div>
+
+        <!-- SECTION 1: LIVE ORDERS -->
+        <section id="section-orders" class="space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="filterOrders('ALL')" class="filter-btn active px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-brass text-saloon-950 border border-brass-dark" data-filter="ALL">Active Shift Orders</button>
+                    <button onclick="filterOrders('Accepted')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-saloon-900 text-brass-light hover:bg-saloon-800 border border-saloon-700" data-filter="Accepted">Accepted</button>
+                    <button onclick="filterOrders('Preparing')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-saloon-900 text-brass-light hover:bg-saloon-800 border border-saloon-700" data-filter="Preparing">Preparing</button>
+                    <button onclick="filterOrders('Ready')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-saloon-900 text-brass-light hover:bg-saloon-800 border border-saloon-700" data-filter="Ready">Ready / Serving</button>
+                    <button onclick="filterOrders('Completed')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-saloon-900 text-brass-light hover:bg-saloon-800 border border-saloon-700" data-filter="Completed">Completed</button>
+                    <button onclick="filterOrders('Cancelled')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-saloon-900 text-rose-400 hover:bg-saloon-800 border border-saloon-700" data-filter="Cancelled">Cancelled</button>
+                </div>
+                <div class="text-xs text-brass/70 font-medium">
+                    Auto-syncing real-time with Website A
+                </div>
+            </div>
+
+            <!-- Orders Grid -->
+            <div id="orders-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="col-span-full text-center py-12 bg-saloon-900 rounded-2xl border-2 border-saloon-700">
+                    <p class="text-brass-light text-xs animate-pulse">Connecting to kitchen order queue...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: MENU STOCK CONTROL -->
+        <section id="section-stock" class="hidden space-y-6">
+            <div class="bg-saloon-900 p-6 rounded-2xl border-2 border-saloon-700 space-y-4 shadow-lg">
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-saloon-700 pb-4">
+                    <div>
+                        <h2 class="font-rye text-lg text-brass-light">Menu Item Stock Availability</h2>
+                        <p class="text-xs text-brass/70 mt-0.5">Items marked out of stock are disabled immediately on Website A</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="setBulkStock(true)" class="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 transition">
+                            <i class="fa-solid fa-check mr-1"></i> Set ALL Available
+                        </button>
+                        <button onclick="setBulkStock(false)" class="px-4 py-2 rounded-xl text-xs font-bold bg-rose-950 text-rose-300 border border-rose-800 hover:bg-rose-900 transition">
+                            <i class="fa-solid fa-xmark mr-1"></i> Set ALL Out of Stock
+                        </button>
+                    </div>
+                </div>
+
+                <div id="stock-categories-container" class="space-y-6">
+                    <!-- Dynamic stock controls rendered here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: SHIFT ANALYTICS & RESET -->
+        <section id="section-shift" class="hidden space-y-6">
+            <div class="bg-saloon-900 p-6 rounded-2xl border-2 border-saloon-700 space-y-6 shadow-lg">
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-saloon-700 pb-4">
+                    <div>
+                        <h2 class="font-rye text-lg text-brass-light">Current Shift Summary</h2>
+                        <p id="shift-start-time" class="text-xs text-brass mt-0.5">Shift Started: Active Session</p>
+                    </div>
+                    <button onclick="openResetShiftModal()" class="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-rose-700 hover:bg-rose-800 text-white shadow-lg transition flex items-center space-x-2 border border-rose-900">
+                        <i class="fa-solid fa-rotate-right mr-1"></i>
+                        <span>Clear Live Orders & Reset Shift (₱0.00)</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="p-4 rounded-xl bg-saloon-950 border border-saloon-800">
+                        <span class="text-xs text-brass/70 font-semibold uppercase">Total Sales Revenue</span>
+                        <p id="shift-total-sales" class="text-2xl font-extrabold text-emerald-400 mt-1">₱0.00</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-saloon-950 border border-saloon-800">
+                        <span class="text-xs text-brass/70 font-semibold uppercase">Completed Orders</span>
+                        <p id="shift-completed-count" class="text-2xl font-extrabold text-brass-light mt-1">0</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-saloon-950 border border-saloon-800">
+                        <span class="text-xs text-brass/70 font-semibold uppercase">GCash Collections</span>
+                        <p id="shift-gcash-sales" class="text-2xl font-extrabold text-blue-400 mt-1">₱0.00</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-saloon-950 border border-saloon-800">
+                        <span class="text-xs text-brass/70 font-semibold uppercase">Over-The-Counter (OTC)</span>
+                        <p id="shift-otc-sales" class="text-2xl font-extrabold text-amber-400 mt-1">₱0.00</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <div class="p-4 rounded-xl bg-saloon-950/80 border border-saloon-800 text-center">
+                        <span class="text-xs text-brass/70 font-medium">Dine-in Orders</span>
+                        <p id="shift-dinein-count" class="text-xl font-bold text-parchment mt-1">0</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-saloon-950/80 border border-saloon-800 text-center">
+                        <span class="text-xs text-brass/70 font-medium">Take-out Orders</span>
+                        <p id="shift-takeout-count" class="text-xl font-bold text-parchment mt-1">0</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-saloon-950/80 border border-saloon-800 text-center">
+                        <span class="text-xs text-brass/70 font-medium">Delivery Orders</span>
+                        <p id="shift-delivery-count" class="text-xl font-bold text-parchment mt-1">0</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- RESET SHIFT CONFIRMATION MODAL -->
+    <div id="reset-shift-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="bg-saloon-900 max-w-md w-full p-6 rounded-2xl border-2 border-rose-600 space-y-5 text-center shadow-2xl">
+            <div class="w-14 h-14 rounded-full bg-rose-950 text-rose-400 flex items-center justify-center mx-auto text-2xl font-bold border border-rose-800">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+                <h3 class="font-rye text-lg text-brass-light">RESET SHIFT & CLEAR LIVE ORDERS?</h3>
+                <p class="text-xs text-parchment-dark mt-2 leading-relaxed">
+                    This will delete past orders from Supabase and reset sales metrics back to ₱0.00 for the new shift.
+                </p>
+            </div>
+            <div class="flex space-x-3 pt-2">
+                <button onclick="closeResetShiftModal()" class="flex-1 py-3 rounded-xl text-xs font-bold bg-saloon-800 text-brass-light hover:bg-saloon-700 transition border border-saloon-600">Cancel</button>
+                <button onclick="executeShiftReset()" class="flex-1 py-3 rounded-xl text-xs font-bold bg-rose-700 text-white hover:bg-rose-800 transition shadow">Confirm & Delete All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RECEIPT PRINT CONTAINER -->
+    <div id="receipt-print-area" class="hidden"></div>
+
+    <!-- AUDIO ALERT FOR NEW ORDERS -->
+    <audio id="order-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
+
+    <script>
+        const SUPABASE_URL = 'https://kgxrdxbysdnwcuwppils.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_cG_oCE-x0_jLxOvCq6cblA_7fE3nvXU';
+        let supabaseClient = null;
+
+        let rawOrders = [];
+        let activeFilter = 'ALL';
+        let isStoreOpen = true;
+        let acceptTakeout = true;
+        let acceptDelivery = true;
+        let menuItemsList = [];
+        let shiftStartTime = localStorage.getItem('elbarako_shift_start') || new Date().toISOString();
+
+        const DEFAULT_MENU_CATEGORIES = [
+            'Latte', 'Premium Coffee', 'Frappe', 'Ice Cream Coffee', 'Non-Coffee',
+            'Soda Series', 'Fruit Juice', 'Add-Ons', 'Waffle', 'Messy Donuts',
+            'Appetizer', 'Pasta', 'Snacks', 'Sandwich', 'Rice Bowl', 'Solo Order', 'Pizza'
+        ];
+
+        function initSupabase(attempts = 0) {
+            if (window.supabase && typeof window.supabase.createClient === 'function') {
+                try {
+                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                    bootDashboard();
+                } catch (e) {
+                    console.error("Supabase init error:", e);
+                }
+            } else if (attempts < 20) {
+                setTimeout(() => initSupabase(attempts + 1), 200);
+            }
+        }
+
+        function bootDashboard() {
+            if (!localStorage.getItem('elbarako_shift_start')) {
+                localStorage.setItem('elbarako_shift_start', shiftStartTime);
+            }
+            updateShiftTimeDisplay();
+
+            fetchStoreStatus();
+            fetchOrders();
+            fetchMenuItems();
+
+            setInterval(() => {
+                fetchOrders(true);
+                fetchStoreStatus();
+            }, 5000);
+        }
+
+        // --- SHIFT TIME DISPLAY & ANALYTICS ---
+        function updateShiftTimeDisplay() {
+            const shiftTimeEl = document.getElementById('shift-start-time');
+            if (shiftTimeEl) {
+                const formattedTime = new Date(shiftStartTime).toLocaleString('en-US', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short'
+                });
+                shiftTimeEl.innerText = `Shift Started: ${formattedTime}`;
+            }
+        }
+
+        function calculateShiftAnalytics() {
+            const shiftDate = new Date(shiftStartTime);
+            const shiftOrders = rawOrders.filter(o => new Date(o.created_at) >= shiftDate && o.status === 'Completed');
+
+            let totalSales = 0;
+            let gcashSales = 0;
+            let otcSales = 0;
+            let dineIn = 0, takeOut = 0, delivery = 0;
+
+            shiftOrders.forEach(o => {
+                const amt = Number(o.total_amount) || 0;
+                totalSales += amt;
+                if (o.payment_method === 'GCash') gcashSales += amt;
+                else otcSales += amt;
+
+                if (o.order_type === 'Dine-in') dineIn++;
+                else if (o.order_type === 'Take-out') takeOut++;
+                else if (o.order_type === 'Delivery') delivery++;
+            });
+
+            const totalSalesEl = document.getElementById('shift-total-sales');
+            const completedCountEl = document.getElementById('shift-completed-count');
+            const gcashSalesEl = document.getElementById('shift-gcash-sales');
+            const otcSalesEl = document.getElementById('shift-otc-sales');
+            const dineInEl = document.getElementById('shift-dinein-count');
+            const takeOutEl = document.getElementById('shift-takeout-count');
+            const deliveryEl = document.getElementById('shift-delivery-count');
+
+            if (totalSalesEl) totalSalesEl.innerText = `₱${totalSales.toFixed(2)}`;
+            if (completedCountEl) completedCountEl.innerText = shiftOrders.length;
+            if (gcashSalesEl) gcashSalesEl.innerText = `₱${gcashSales.toFixed(2)}`;
+            if (otcSalesEl) otcSalesEl.innerText = `₱${otcSales.toFixed(2)}`;
+            if (dineInEl) dineInEl.innerText = dineIn;
+            if (takeOutEl) takeOutEl.innerText = takeOut;
+            if (deliveryEl) deliveryEl.innerText = delivery;
+        }
+
+        // --- STORE STATUS & SERVICE TOGGLES ---
+        async function fetchStoreStatus() {
+            if (!supabaseClient) return;
+            try {
+                const { data } = await supabaseClient.from('store_settings').select('*');
+                if (data && data.length > 0) {
+                    data.forEach(row => {
+                        if (row.setting_key === 'is_open') isStoreOpen = (row.setting_value === 'true' || row.setting_value === true);
+                        if (row.setting_key === 'accept_takeout') acceptTakeout = (row.setting_value === 'true' || row.setting_value === true);
+                        if (row.setting_key === 'accept_delivery') acceptDelivery = (row.setting_value === 'true' || row.setting_value === true);
+                    });
+                    renderStoreControlsUI();
+                }
+            } catch (err) {
+                console.warn("Store status fetch warning:", err);
+            }
+        }
+
+        async function toggleStoreStatus() {
+            const nextStatus = !isStoreOpen;
+            isStoreOpen = nextStatus;
+            renderStoreControlsUI();
+
+            if (!supabaseClient) return;
+            try {
+                await supabaseClient.from('store_settings').upsert({
+                    setting_key: 'is_open',
+                    setting_value: nextStatus ? 'true' : 'false',
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'setting_key' });
+            } catch (err) {
+                console.error("Toggle store status error:", err);
+            }
+        }
+
+        async function toggleOrderTypeSetting(settingKey) {
+            let nextVal = true;
+            if (settingKey === 'accept_takeout') {
+                acceptTakeout = !acceptTakeout;
+                nextVal = acceptTakeout;
+            } else if (settingKey === 'accept_delivery') {
+                acceptDelivery = !acceptDelivery;
+                nextVal = acceptDelivery;
+            }
+
+            renderStoreControlsUI();
+
+            if (!supabaseClient) return;
+            try {
+                await supabaseClient.from('store_settings').upsert({
+                    setting_key: settingKey,
+                    setting_value: nextVal ? 'true' : 'false',
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'setting_key' });
+            } catch (err) {
+                console.error("Order type toggle error:", err);
+            }
+        }
+
+        function renderStoreControlsUI() {
+            const storeBtn = document.getElementById('toggle-store-btn');
+            const storeDot = document.getElementById('store-dot');
+            const storeText = document.getElementById('store-btn-text');
+
+            if (storeBtn && storeDot && storeText) {
+                if (isStoreOpen) {
+                    storeBtn.className = "px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all duration-300 shadow flex items-center space-x-1.5 border bg-emerald-950 text-emerald-300 border-emerald-800";
+                    storeDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+                    storeText.innerText = "STORE OPEN";
+                } else {
+                    storeBtn.className = "px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all duration-300 shadow flex items-center space-x-1.5 border bg-rose-950 text-rose-300 border-rose-800";
+                    storeDot.className = "w-2 h-2 rounded-full bg-rose-400";
+                    storeText.innerText = "STORE CLOSED";
+                }
+            }
+
+            const takeoutBtn = document.getElementById('toggle-takeout-btn');
+            const takeoutDot = document.getElementById('takeout-dot');
+            const takeoutText = document.getElementById('takeout-btn-text');
+
+            if (takeoutBtn && takeoutDot && takeoutText) {
+                if (acceptTakeout) {
+                    takeoutBtn.className = "px-3 py-1.5 rounded-xl font-bold text-xs transition-all duration-300 shadow flex items-center space-x-1.5 border bg-amber-950 text-amber-300 border-amber-800";
+                    takeoutDot.className = "w-2 h-2 rounded-full bg-amber-400";
+                    takeoutText.innerText = "Take-out: AVAILABLE";
+                } else {
+                    takeoutBtn.className = "px-3 py-1.5 rounded-xl font-bold text-xs transition-all duration-300 shadow flex items-center space-x-1.5 border bg-saloon-950 text-stone-500 border-saloon-800";
+                    takeoutDot.className = "w-2 h-2 rounded-full bg-stone-600";
+                    takeoutText.innerText = "Take-out: CLOSED";
+                }
+            }
+
+            const deliveryBtn = document.getElementById('toggle-delivery-btn');
+            const deliveryDot = document.getElementById('delivery-dot');
+            const deliveryText = document.getElementById('delivery-btn-text');
+
+            if (deliveryBtn && deliveryDot && deliveryText) {
+                if (acceptDelivery) {
+                    deliveryBtn.className = "px-3 py-1.5 rounded-xl font-bold text-xs transition-all duration-300 shadow flex items-center space-x-1.5 border bg-blue-950 text-blue-300 border-blue-800";
+                    deliveryDot.className = "w-2 h-2 rounded-full bg-blue-400";
+                    deliveryText.innerText = "Delivery: AVAILABLE";
+                } else {
+                    deliveryBtn.className = "px-3 py-1.5 rounded-xl font-bold text-xs transition-all duration-300 shadow flex items-center space-x-1.5 border bg-saloon-950 text-stone-500 border-saloon-800";
+                    deliveryDot.className = "w-2 h-2 rounded-full bg-stone-600";
+                    deliveryText.innerText = "Delivery: CLOSED";
+                }
+            }
+        }
+
+        // --- ORDERS MANAGEMENT ---
+        async function fetchOrders(silent = false) {
+            if (!supabaseClient) return;
+            try {
+                const { data, error } = await supabaseClient.from('orders').select('*').order('created_at', { ascending: false });
+                if (error) throw error;
+
+                if (data) {
+                    if (silent && data.length > rawOrders.length) playOrderAlert();
+                    rawOrders = data;
+                    renderOrders();
+                    calculateShiftAnalytics();
+                }
+            } catch (err) {
+                console.warn("Orders fetch warning:", err);
+            }
+        }
+
+        function filterOrders(filter) {
+            activeFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                if (btn.dataset.filter === filter) {
+                    btn.className = 'filter-btn active px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-brass text-saloon-950 border border-brass-dark';
+                } else {
+                    btn.className = 'filter-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-saloon-900 text-brass-light hover:bg-saloon-800 border border-saloon-700';
+                }
+            });
+            renderOrders();
+        }
+
+        // --- ORDER ACTION HELPERS ---
+        function getNextStatus(current, type) {
+            if (current === 'Accepted') return 'Preparing';
+            if (current === 'Preparing') return type === 'Dine-in' ? 'Serving' : (type === 'Delivery' ? 'Ready to deliver' : 'Ready to claim');
+            return 'Completed';
+        }
+
+        async function updateOrderStatus(orderId, newStatus) {
+            if (!supabaseClient) return;
+            try {
+                await supabaseClient.from('orders').update({ status: newStatus }).eq('id', orderId);
+                fetchOrders();
+            } catch (err) {
+                console.error("Status update error:", err);
+            }
+        }
+
+        // --- MENU STOCK MANAGEMENT ---
+        async function fetchMenuItems() {
+            if (!supabaseClient) return;
+            try {
+                const { data } = await supabaseClient.from('menu_items').select('*');
+                menuItemsList = data || [];
+                renderStockControl();
+            } catch (err) {
+                console.warn("Menu fetch warning:", err);
+            }
+        }
+
+        function renderStockControl() {
+            const container = document.getElementById('stock-categories-container');
+            if (!container) return;
+
+            container.innerHTML = DEFAULT_MENU_CATEGORIES.map(category => {
+                const categoryItems = menuItemsList.filter(i => i.category === category);
+                return `
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-bold text-brass uppercase tracking-wider">${category}</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            ${categoryItems.length ? categoryItems.map(item => `
+                                <div class="p-3 rounded-xl bg-saloon-950 border border-saloon-800 flex items-center justify-between">
+                                    <span class="text-xs font-semibold text-parchment truncate pr-2">${escapeHtml(item.item_name)}</span>
+                                    <button onclick="toggleItemStock('${item.item_id}', ${!item.is_available})" class="px-3 py-1 rounded-lg text-[10px] font-bold ${item.is_available ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'}">
+                                        ${item.is_available ? 'IN STOCK' : 'OUT OF STOCK'}
+                                    </button>
+                                </div>
+                            `).join('') : `<p class="text-xs text-brass/50 italic col-span-full">All standard items available</p>`}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function toggleItemStock(itemId, isAvailable) {
+            if (!supabaseClient) return;
+            try {
+                await supabaseClient.from('menu_items').update({ is_available: isAvailable, updated_at: new Date().toISOString() }).eq('item_id', itemId);
+                fetchMenuItems();
+            } catch (err) {
+                console.error("Item stock toggle error:", err);
+            }
+        }
+
+        async function setBulkStock(isAvailable) {
+            if (!supabaseClient) return;
+            try {
+                await supabaseClient.from('menu_items').update({ is_available: isAvailable, updated_at: new Date().toISOString() }).neq('item_id', '');
+                fetchMenuItems();
+            } catch (err) {
+                console.error("Bulk stock error:", err);
+            }
+        }
+
+        function renderOrders() {
+            const grid = document.getElementById('orders-grid');
+            const badge = document.getElementById('orders-count-badge');
+
+            const shiftDate = new Date(shiftStartTime);
+            const activeShiftOrders = rawOrders.filter(o => new Date(o.created_at) >= shiftDate);
+
+            let displayList = activeShiftOrders;
+            if (activeFilter === 'Accepted') displayList = activeShiftOrders.filter(o => o.status === 'Accepted');
+            else if (activeFilter === 'Preparing') displayList = activeShiftOrders.filter(o => o.status === 'Preparing');
+            else if (activeFilter === 'Ready') displayList = activeShiftOrders.filter(o => ['Serving', 'Ready to claim', 'Ready to deliver'].includes(o.status));
+            else if (activeFilter === 'Completed') displayList = activeShiftOrders.filter(o => o.status === 'Completed');
+            else if (activeFilter === 'Cancelled') displayList = activeShiftOrders.filter(o => o.status === 'Cancelled');
+
+            if (badge) badge.innerText = activeShiftOrders.filter(o => !['Completed', 'Cancelled'].includes(o.status)).length;
+
+            if (displayList.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full text-center py-12 bg-saloon-900 rounded-2xl border-2 border-saloon-700">
+                        <p class="text-brass/70 text-xs">No orders under "${activeFilter}" for this shift.</p>
+                    </div>`;
+                return;
+            }
+
+            grid.innerHTML = displayList.map(order => {
+                const itemsList = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+                const isCancelled = order.status === 'Cancelled';
+                const isCompleted = order.status === 'Completed';
+
+                let statusBadgeColor = 'bg-amber-950 text-amber-300 border-amber-800';
+                if (order.status === 'Preparing') statusBadgeColor = 'bg-blue-950 text-blue-300 border-blue-800';
+                else if (order.status.includes('Ready') || order.status === 'Serving') statusBadgeColor = 'bg-purple-950 text-purple-300 border-purple-800';
+                else if (isCompleted) statusBadgeColor = 'bg-emerald-950 text-emerald-300 border-emerald-800';
+                else if (isCancelled) statusBadgeColor = 'bg-rose-950 text-rose-300 border-rose-800';
+
+                return `
+                    <div class="bg-saloon-900 p-5 rounded-2xl border-2 border-saloon-700 flex flex-col justify-between space-y-4 relative ${isCancelled ? 'opacity-60' : ''} shadow">
+                        <div>
+                            <div class="flex items-start justify-between border-b border-saloon-700 pb-3">
+                                <div>
+                                    <span class="text-xs font-bold text-brass">${order.order_id || 'ORD-000'}</span>
+                                    <h3 class="font-extrabold text-parchment text-sm mt-0.5">${escapeHtml(order.customer_name)}</h3>
+                                    <p class="text-xs text-brass/70 mt-0.5">${order.contact_number} • ${order.order_type}</p>
+                                </div>
+                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase border ${statusBadgeColor}">
+                                    ${order.status}
+                                </span>
+                            </div>
+
+                            <!-- COMPLETE CUSTOMER & FULFILLMENT DETAILS CARD VIEW -->
+                            <div class="py-2.5 px-3 rounded-xl bg-saloon-950 border border-saloon-800 mt-3 text-xs space-y-1">
+                                ${order.order_type === 'Dine-in' ? `<p><span class="text-brass/70">Table:</span> <strong class="text-brass-light font-bold">${escapeHtml(order.table_number || 'N/A')}</strong></p>` : ''}
+                                ${order.order_type === 'Take-out' ? `<p><span class="text-brass/70">Claim #:</span> <strong class="text-brass-light font-bold">${escapeHtml(order.claim_number || 'N/A')}</strong></p>` : ''}
+                                ${order.order_type === 'Delivery' ? `<p><span class="text-brass/70">Address:</span> <strong class="text-brass-light font-bold">${escapeHtml(order.delivery_address || 'N/A')}</strong></p>` : ''}
+                                <p><span class="text-brass/70">Payment:</span> <strong class="text-parchment">${escapeHtml(order.payment_method)}</strong></p>
+                            </div>
+
+                            <div class="py-3 space-y-1.5 text-xs text-parchment-dark">
+                                ${itemsList.map(item => `
+                                    <div class="flex justify-between items-center">
+                                        <span><strong class="text-parchment">${item.quantity || 1}x</strong> ${escapeHtml(item.name || item.title)} (${item.variant || 'Regular'})</span>
+                                        <span class="text-brass/80">₱${((item.price || 0) * (item.quantity || 1)).toFixed(2)}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="border-t border-saloon-700 pt-3 space-y-3">
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="text-brass/70">Total (${order.payment_method}):</span>
+                                <span class="text-sm font-extrabold text-emerald-400">₱${Number(order.total_amount).toFixed(2)}</span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="printReceipt('${order.id}')" class="px-3 py-2 rounded-xl text-xs font-bold bg-saloon-800 hover:bg-saloon-700 text-brass-light transition flex items-center justify-center space-x-1.5 border border-saloon-600">
+                                    <i class="fa-solid fa-print"></i> <span>Print</span>
+                                </button>
+                                ${!isCompleted && !isCancelled ? `
+                                    <button onclick="updateOrderStatus('${order.id}', '${getNextStatus(order.status, order.order_type)}')" class="px-3 py-2 rounded-xl text-xs font-bold bg-brass text-saloon-950 hover:bg-brass-light transition border border-brass-dark">
+                                        Advance <i class="fa-solid fa-arrow-right ml-1"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+
+                            ${!isCompleted && !isCancelled ? `
+                                <button onclick="updateOrderStatus('${order.id}', 'Cancelled')" class="w-full py-1.5 text-[11px] font-semibold text-rose-400 hover:text-rose-300 transition">
+                                    Cancel Order
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- SHIFT RESET ENGINE ---
+        function openResetShiftModal() {
+            document.getElementById('reset-shift-modal')?.classList.remove('hidden');
+        }
+
+        function closeResetShiftModal() {
+            document.getElementById('reset-shift-modal')?.classList.add('hidden');
+        }
+
+        async function executeShiftReset() {
+            shiftStartTime = new Date().toISOString();
+            localStorage.setItem('elbarako_shift_start', shiftStartTime);
+            updateShiftTimeDisplay();
+
+            if (supabaseClient) {
+                try {
+                    const { error } = await supabaseClient
+                        .from('orders')
+                        .delete()
+                        .lt('created_at', shiftStartTime);
+                    
+                    if (error) console.warn("Error deleting past shift orders:", error.message);
+                } catch (err) {
+                    console.error("Database deletion exception:", err);
+                }
+            }
+
+            rawOrders = [];
+            renderOrders();
+            calculateShiftAnalytics();
+            closeResetShiftModal();
+        }
+
+        // --- RECEIPT PRINTING ENHANCED (INCLUDES ALL CUSTOMER & ORDER DETAILS) ---
+        function printReceipt(orderId) {
+            const order = rawOrders.find(o => o.id === orderId);
+            if (!order) return;
+
+            const itemsList = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+            const printArea = document.getElementById('receipt-print-area');
+            if (!printArea) return;
+
+            printArea.innerHTML = `
+                <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 5px; margin-bottom: 5px;">
+                    <h3 style="font-size: 14px; font-weight: bold; margin: 0;">EL BARAKO CAFE</h3>
+                    <p style="margin: 2px 0;">Official Order Receipt</p>
+                    <p style="margin: 2px 0;">${new Date(order.created_at).toLocaleString()}</p>
+                </div>
+                <div style="margin-bottom: 5px; font-size: 11px;">
+                    <p style="margin: 2px 0;"><strong>Order ID:</strong> ${order.order_id}</p>
+                    <p style="margin: 2px 0;"><strong>Customer Name:</strong> ${escapeHtml(order.customer_name)}</p>
+                    <p style="margin: 2px 0;"><strong>Contact No.:</strong> ${escapeHtml(order.contact_number)}</p>
+                    <p style="margin: 2px 0;"><strong>Order Type:</strong> ${order.order_type}</p>
+                    ${order.table_number ? `<p style="margin: 2px 0;"><strong>Table Number:</strong> ${escapeHtml(order.table_number)}</p>` : ''}
+                    ${order.claim_number ? `<p style="margin: 2px 0;"><strong>Claim Number:</strong> ${escapeHtml(order.claim_number)}</p>` : ''}
+                    ${order.delivery_address ? `<p style="margin: 2px 0;"><strong>Delivery Address:</strong> ${escapeHtml(order.delivery_address)}</p>` : ''}
+                    <p style="margin: 2px 0;"><strong>Payment Method:</strong> ${order.payment_method}</p>
+                </div>
+                <div style="border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 5px 0; margin-bottom: 5px;">
+                    <div style="font-weight: bold; margin-bottom: 3px;">Items Ordered:</div>
+                    ${itemsList.map(item => `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                            <span>${item.quantity || 1}x ${escapeHtml(item.name || item.title)} (${item.variant || 'Regular'})</span>
+                            <span>₱${((item.price || 0) * (item.quantity || 1)).toFixed(2)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <div style="text-align: right; font-weight: bold; font-size: 12px; margin-top: 5px;">
+                    TOTAL AMOUNT: ₱${Number(order.total_amount).toFixed(2)}
+                </div>
+                <div style="text-align: center; margin-top: 10px; font-size: 10px; border-top: 1px dashed #000; padding-top: 5px;">
+                    Thank you for dining at EL BARAKO CAFE!
+                </div>
+            `;
+
+            printArea.classList.remove('hidden');
+            window.print();
+            printArea.classList.add('hidden');
+        }
+
+        // --- UTILS ---
+        function switchTab(tab) {
+            document.getElementById('section-orders')?.classList.toggle('hidden', tab !== 'orders');
+            document.getElementById('section-stock')?.classList.toggle('hidden', tab !== 'stock');
+            document.getElementById('section-shift')?.classList.toggle('hidden', tab !== 'shift');
+
+            const tabOrders = document.getElementById('tab-orders');
+            const tabStock = document.getElementById('tab-stock');
+            const tabShift = document.getElementById('tab-shift');
+
+            const activeClass = 'px-5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 flex items-center space-x-2 bg-brass text-saloon-950 shadow-md border border-brass-dark';
+            const inactiveClass = 'px-5 py-2.5 rounded-xl font-bold text-xs text-brass-light hover:text-white hover:bg-saloon-800 transition-all duration-200 flex items-center space-x-2 border border-saloon-700';
+
+            if (tabOrders) tabOrders.className = tab === 'orders' ? activeClass : inactiveClass;
+            if (tabStock) tabStock.className = tab === 'stock' ? activeClass : inactiveClass;
+            if (tabShift) tabShift.className = tab === 'shift' ? activeClass : inactiveClass;
+        }
+
+        function playOrderAlert() {
+            const audio = document.getElementById('order-sound');
+            if (audio) {
+                audio.play().catch(() => {});
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => initSupabase());
+    </script>
+</body>
+</html>
